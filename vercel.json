@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/cloudinary/:path*",
+      "destination": "https://api.cloudinary.com/:path*"
+    }
+  ]
+}

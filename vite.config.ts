@@ -1,4 +1,8 @@
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
 import { defineConfig } from 'vite';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   server: {
@@ -17,5 +21,12 @@ export default defineConfig({
   build: {
     target: 'es2020',
     outDir: 'dist',
+    rollupOptions: {
+      // Multi-page app — both HTML files must be declared so Vite includes them in dist/.
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        gallery: resolve(__dirname, 'gallery.html'),
+      },
+    },
   },
 });
