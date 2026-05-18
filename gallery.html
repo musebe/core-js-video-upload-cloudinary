@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Browse uploaded videos with auto-generated transcripts and AI tags." />
+    <title>Video Gallery · Cloudinary</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="/src/styles.css" />
+    <link rel="stylesheet" href="/src/gallery.css" />
+  </head>
+
+  <body>
+    <div class="app-wrapper">
+
+      <!-- ── Nav ───────────────────────────────────────────────────────────── -->
+      <nav class="gallery-nav" aria-label="Site navigation">
+        <a href="/" class="nav-back" aria-label="Go back to upload page">
+          <span aria-hidden="true">←</span> Upload
+        </a>
+        <div class="nav-center">
+          <span class="nav-icon" aria-hidden="true">🎬</span>
+          <span class="nav-title">Video Gallery</span>
+        </div>
+        <span id="video-count" class="nav-count" aria-live="polite"></span>
+      </nav>
+
+      <!-- ── Config error ───────────────────────────────────────────────────── -->
+      <div id="config-banner" class="banner banner--warning" role="alert" aria-live="polite">
+        <span class="banner__icon" aria-hidden="true">⚠</span>
+        <div class="banner__body">
+          <span class="banner__title">Configuration required</span>
+          <span id="config-error-message" class="banner__detail"></span>
+        </div>
+      </div>
+
+      <!-- ── Toolbar ────────────────────────────────────────────────────────── -->
+      <div class="gallery-toolbar" id="gallery-toolbar" hidden>
+        <div class="search-wrap">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input
+            id="search-input"
+            type="search"
+            class="search-input"
+            placeholder="Filter by name or tag…"
+            aria-label="Search videos"
+          />
+        </div>
+        <button id="btn-clear-all" class="btn btn--danger" aria-label="Remove all videos from gallery">
+          <span aria-hidden="true">🗑</span> Clear all
+        </button>
+      </div>
+
+      <!-- ── Empty state ────────────────────────────────────────────────────── -->
+      <div id="empty-state" class="empty-state" hidden>
+        <span class="empty-state__icon" aria-hidden="true">📭</span>
+        <p class="empty-state__title">No videos yet</p>
+        <p class="empty-state__sub">Upload a video to see it appear here.</p>
+        <a href="/" class="btn btn--primary" style="margin-top: 1.5rem;">
+          <span aria-hidden="true">⬆</span> Upload your first video
+        </a>
+      </div>
+
+      <!-- ── Video grid ─────────────────────────────────────────────────────── -->
+      <main id="video-grid" class="video-grid" aria-label="Uploaded videos"></main>
+
+      <!-- ── Footer ─────────────────────────────────────────────────────────── -->
+      <footer class="app-footer">
+        Transcripts &amp; tags powered by
+        <a href="https://cloudinary.com" target="_blank" rel="noopener">Cloudinary</a>
+        AI addons
+      </footer>
+
+    </div>
+
+    <!-- ── Video card template ───────────────────────────────────────────────── -->
+    <template id="card-template">
+      <article class="video-card" aria-label="Video">
+
+        <!-- Thumbnail -->
+        <div class="card-thumb">
+          <img class="card-thumb__img" alt="" loading="lazy" />
+          <div class="card-thumb__badges">
+            <span class="thumb-badge thumb-badge--duration"></span>
+            <span class="thumb-badge thumb-badge--format"></span>
+          </div>
+          <button class="card-play-btn" aria-label="Play video">▶</button>
+        </div>
+
+        <!-- Inline player (hidden until play is clicked) -->
+        <div class="card-player" hidden>
+          <video class="card-video" controls preload="none"></video>
+        </div>
+
+        <!-- Body -->
+        <div class="card-body">
+
+          <!-- Editable title row -->
+          <div class="card-title-row">
+            <h3 class="card-title" title=""></h3>
+            <button class="btn-edit-name" aria-label="Rename video" title="Rename">✎</button>
+          </div>
+
+          <!-- Inline rename form (hidden by default) -->
+          <form class="rename-form" hidden aria-label="Rename video">
+            <input
+              class="rename-input"
+              type="text"
+              maxlength="120"
+              placeholder="Enter a new name…"
+              aria-label="New video name"
+            />
+            <div class="rename-actions">
+              <button type="submit" class="btn btn--primary rename-save">Save</button>
+              <button type="button" class="btn btn--ghost rename-cancel">Cancel</button>
+            </div>
+            <p class="rename-error" hidden></p>
+          </form>
+
+          <p class="card-meta"></p>
+
+          <!-- Tags -->
+          <div class="card-tags" aria-label="Video tags">
+            <span class="tags-label">Tags</span>
+            <div class="tags-list"></div>
+            <button class="btn btn--ghost tags-refresh-btn" hidden aria-label="Refresh tags from Cloudinary">↻ Refresh tags</button>
+          </div>
+
+          <!-- Transcript section -->
+          <div class="card-transcript">
+            <button class="transcript-toggle" aria-expanded="false">
+              <span class="transcript-toggle__icon" aria-hidden="true">📝</span>
+              <span class="transcript-toggle__label">Show transcript</span>
+              <span class="transcript-toggle__chevron" aria-hidden="true">›</span>
+            </button>
+            <div class="transcript-panel" hidden role="region" aria-label="Video transcript">
+              <div class="transcript-content">
+                <!-- Filled by JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Card actions -->
+          <div class="card-actions">
+            <a class="btn btn--ghost card-open-btn" target="_blank" rel="noopener" aria-label="Open video on Cloudinary">
+              <span aria-hidden="true">↗</span> Open
+            </a>
+            <button class="btn btn--danger card-delete-btn" aria-label="Remove video from gallery">
+              <span aria-hidden="true">🗑</span> Remove
+            </button>
+          </div>
+        </div>
+
+      </article>
+    </template>
+
+    <script type="module" src="/src/gallery.ts"></script>
+  </body>
+</html>

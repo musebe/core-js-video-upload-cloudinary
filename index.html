@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Chunked video upload and preview app using vanilla TypeScript and Cloudinary." />
+    <title>Video Upload · Cloudinary Chunked Upload</title>
+
+    <!-- Preload fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="/src/styles.css" />
+    <style>
+      .upload-page-nav {
+        display: flex;
+        justify-content: flex-end;
+        padding-top: var(--space-4);
+      }
+      .upload-page-nav a {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--clr-text-secondary);
+        text-decoration: none;
+        transition: color 150ms;
+      }
+      .upload-page-nav a:hover { color: var(--clr-accent); }
+    </style>
+  </head>
+
+  <body>
+    <div class="app-wrapper">
+
+      <!-- ── Nav ───────────────────────────────────────────────────────────── -->
+      <nav class="upload-page-nav" aria-label="Site navigation">
+        <a href="/gallery.html">My Videos <span aria-hidden="true">→</span></a>
+      </nav>
+
+      <!-- ── Header ─────────────────────────────────────────────────────────── -->
+      <header class="app-header">
+        <div class="logo-mark" aria-hidden="true">▶</div>
+        <h1>Video Upload &amp; Preview</h1>
+        <p>Chunked uploads powered by Cloudinary — handles any file size reliably.</p>
+        <div class="badge-list" role="list">
+          <span class="badge" role="listitem">Chunked Upload</span>
+          <span class="badge" role="listitem">Progress Tracking</span>
+          <span class="badge" role="listitem">Pause / Resume</span>
+          <span class="badge" role="listitem">Auto Retry</span>
+          <span class="badge" role="listitem">Video Delivery</span>
+        </div>
+      </header>
+
+      <!-- ── Config error banner (shown when .env is missing) ───────────────── -->
+      <div
+        id="config-banner"
+        class="banner banner--warning"
+        role="alert"
+        aria-live="polite"
+      >
+        <span class="banner__icon" aria-hidden="true">⚠</span>
+        <div class="banner__body">
+          <span class="banner__title">Configuration required</span>
+          <span id="config-error-message" class="banner__detail"></span>
+        </div>
+      </div>
+
+      <!-- ── Drop zone ──────────────────────────────────────────────────────── -->
+      <section
+        id="drop-zone"
+        class="drop-zone"
+        role="button"
+        tabindex="0"
+        aria-label="Click or drag a video file here to select it for upload"
+      >
+        <span class="drop-zone__icon" aria-hidden="true">🎬</span>
+        <p class="drop-zone__title">Drop your video here</p>
+        <p class="drop-zone__subtitle">or click to browse from your device</p>
+
+        <div class="drop-zone__formats" role="list" aria-label="Supported formats">
+          <span class="format-pill" role="listitem">MP4</span>
+          <span class="format-pill" role="listitem">WebM</span>
+          <span class="format-pill" role="listitem">MOV</span>
+          <span class="format-pill" role="listitem">AVI</span>
+          <span class="format-pill" role="listitem">MKV</span>
+          <span class="format-pill" role="listitem">MPEG</span>
+          <span class="format-pill" role="listitem">3GP</span>
+        </div>
+
+        <!-- Hidden file input — activated by clicking the drop zone -->
+        <input
+          id="file-input"
+          type="file"
+          accept="video/*"
+          hidden
+          aria-label="File input"
+        />
+      </section>
+
+      <!-- ── Error banner ───────────────────────────────────────────────────── -->
+      <div
+        id="error-banner"
+        class="banner banner--error"
+        role="alert"
+        aria-live="assertive"
+        hidden
+      >
+        <span class="banner__icon" aria-hidden="true">✕</span>
+        <div class="banner__body">
+          <span class="banner__title">Something went wrong</span>
+          <span id="error-message" class="banner__detail"></span>
+        </div>
+      </div>
+
+      <!-- ── Selected file info ─────────────────────────────────────────────── -->
+      <div id="file-info" class="file-info" hidden aria-label="Selected file details">
+        <span class="file-icon" aria-hidden="true">📹</span>
+        <div class="file-meta">
+          <p id="file-name" class="file-meta__name" title=""></p>
+          <div class="file-meta__details">
+            <span>
+              <span aria-hidden="true">📦</span>
+              <span id="file-size"></span>
+            </span>
+            <span>
+              <span aria-hidden="true">🎞</span>
+              <span id="file-type"></span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Upload section ─────────────────────────────────────────────────── -->
+      <section id="upload-section" class="upload-section" hidden aria-label="Upload controls">
+
+        <!-- Action buttons -->
+        <div class="btn-group" role="group" aria-label="Upload actions">
+          <button
+            id="btn-upload"
+            class="btn btn--primary"
+            disabled
+            aria-label="Start uploading the selected video"
+          >
+            <span aria-hidden="true">⬆</span> Upload Video
+          </button>
+
+          <button id="btn-pause"  class="btn btn--ghost"   hidden aria-label="Pause upload">
+            <span aria-hidden="true">⏸</span> Pause
+          </button>
+
+          <button id="btn-resume" class="btn btn--ghost"   hidden aria-label="Resume upload">
+            <span aria-hidden="true">▶</span> Resume
+          </button>
+
+          <button id="btn-cancel" class="btn btn--danger"  hidden aria-label="Cancel upload">
+            <span aria-hidden="true">✕</span> Cancel
+          </button>
+
+          <button id="btn-reset"  class="btn btn--ghost"   hidden aria-label="Start over with a new file">
+            <span aria-hidden="true">↺</span> New Upload
+          </button>
+        </div>
+
+        <!-- Progress card -->
+        <div class="card progress-card" aria-label="Upload progress">
+          <div class="progress-header">
+            <span
+              id="chunk-label"
+              class="progress-chunk-label"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              Ready to upload
+            </span>
+            <span id="percent-label" class="progress-percent" aria-hidden="true">0%</span>
+          </div>
+
+          <!-- ARIA progress bar -->
+          <div
+            id="progress-bar"
+            class="progress-track"
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="0"
+            aria-label="Upload progress"
+          >
+            <div id="progress-fill" class="progress-fill"></div>
+          </div>
+
+          <!-- Stats row -->
+          <div class="progress-stats" aria-label="Upload statistics">
+            <div class="stat-item">
+              <span class="stat-label">Transferred</span>
+              <span id="progress-text" class="stat-value">—</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Speed</span>
+              <span id="speed-label" class="stat-value">—</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Time left</span>
+              <span id="eta-label" class="stat-value">—</span>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ── Result section ─────────────────────────────────────────────────── -->
+      <section id="result-section" class="card" hidden aria-label="Upload result">
+
+        <!-- Success header -->
+        <div class="success-header">
+          <div class="success-icon" aria-hidden="true">✓</div>
+          <div class="success-text">
+            <strong>Upload successful</strong>
+            <span>Your video is live on Cloudinary's global CDN</span>
+          </div>
+        </div>
+
+        <!-- Video player -->
+        <div class="video-wrapper">
+          <video
+            id="video-player"
+            class="video-player"
+            controls
+            preload="metadata"
+            aria-label="Uploaded video preview"
+          ></video>
+        </div>
+
+        <!-- Asset metadata grid -->
+        <div class="result-meta" aria-label="Video metadata">
+          <div class="meta-item">
+            <p class="meta-item__label">Duration</p>
+            <p id="result-duration" class="meta-item__value">—</p>
+          </div>
+          <div class="meta-item">
+            <p class="meta-item__label">Resolution</p>
+            <p id="result-resolution" class="meta-item__value">—</p>
+          </div>
+          <div class="meta-item">
+            <p class="meta-item__label">Format</p>
+            <p id="result-format" class="meta-item__value">—</p>
+          </div>
+          <div class="meta-item">
+            <p class="meta-item__label">Stored size</p>
+            <p id="result-size" class="meta-item__value">—</p>
+          </div>
+        </div>
+
+        <!-- URL row with copy button -->
+        <div class="url-row" aria-label="Video URL">
+          <a
+            id="result-url"
+            href="#"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open video in new tab"
+          ></a>
+          <button
+            id="btn-copy-url"
+            class="btn btn--success"
+            aria-label="Copy video URL to clipboard"
+          >
+            <span aria-hidden="true">⎘</span> Copy URL
+          </button>
+        </div>
+
+      </section>
+
+      <!-- ── How it works ───────────────────────────────────────────────────── -->
+      <section class="card" aria-labelledby="how-it-works-title">
+        <h2 id="how-it-works-title" class="card-title">How it works</h2>
+        <ol class="how-it-works" role="list">
+          <li class="step">
+            <span class="step__number" aria-hidden="true">1</span>
+            <div class="step__content">
+              <strong>File is sliced into 10 MB chunks</strong>
+              <p>
+                The browser splits the video using <code>File.slice()</code> — no server
+                involvement and no temporary storage needed.
+              </p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step__number" aria-hidden="true">2</span>
+            <div class="step__content">
+              <strong>Each chunk is uploaded with identity headers</strong>
+              <p>
+                Every request carries <code>X-Unique-Upload-Id</code> (shared UUID) and
+                <code>Content-Range: bytes start-end/total</code> so Cloudinary can
+                track and order the pieces.
+              </p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step__number" aria-hidden="true">3</span>
+            <div class="step__content">
+              <strong>Failed chunks are retried automatically</strong>
+              <p>
+                Network blips won't abort the upload. Each chunk retries up to 3 times
+                with exponential back-off before the upload fails.
+              </p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step__number" aria-hidden="true">4</span>
+            <div class="step__content">
+              <strong>Cloudinary assembles and hosts the video</strong>
+              <p>
+                Once the final chunk arrives, Cloudinary stitches the pieces into a
+                single asset and returns a global CDN URL for instant streaming.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <!-- ── Footer ─────────────────────────────────────────────────────────── -->
+      <footer class="app-footer">
+        Built with
+        <a href="https://cloudinary.com" target="_blank" rel="noopener">Cloudinary</a>
+        · Vanilla TypeScript · No frameworks
+      </footer>
+
+    </div><!-- /.app-wrapper -->
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
